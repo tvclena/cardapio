@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+
+<title>Cardápio Digital</title>
+
+<meta name="viewport"
+  content="width=device-width,
+  initial-scale=1,
+  maximum-scale=1,
+  user-scalable=no,
+  viewport-fit=cover">
+
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root{
+  --bg:#000;
+  --panel:#0e0e0e;
+  --card:#141414;
+  --text:#fff;
+  --muted:#aaa;
+  --border:#222;
+  --accent:#ff6a00;
+}
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:Inter,system-ui,sans-serif;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+body{
+  padding-bottom:80px;
+}
+
+/* ================= HEADER ================= */
+header{
+  position:sticky;
+  top:0;
+  z-index:10;
+  background:linear-gradient(180deg,#000 70%,transparent);
+  padding:16px;
+}
+
+.search{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+  color:#fff;
+  width:100%;
+  font-size:16px;
+}
+
+/* ================= BANNERS ================= */
+#banners{
+  display:flex;
+  overflow-x:auto;
+  gap:12px;
+  padding:16px;
+  scroll-snap-type:x mandatory;
+}
+
+.banner{
+  min-width:90%;
+  height:200px;
+  border-radius:18px;
+  overflow:hidden;
+  background:#000;
+  scroll-snap-align:center;
+}
+
+.banner img,
+.banner video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+/* ================= CATEGORIAS ================= */
+#categorias{
+  display:flex;
+  gap:10px;
+  padding:12px 16px;
+  overflow-x:auto;
+}
+
+.cat{
+  padding:10px 16px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:999px;
+  white-space:nowrap;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.cat.active{
+  background:var(--accent);
+  color:#000;
+}
+
+/* ================= PRODUTOS ================= */
+section{
+  padding:16px;
+}
+
+.categoria-title{
+  font-size:20px;
+  margin:24px 0 12px;
+}
+
+.produto{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:14px;
+  margin-bottom:14px;
+}
+
+.produto h3{
+  font-size:17px;
+}
+
+.produto p{
+  font-size:14px;
+  color:var(--muted);
+  margin:6px 0;
+}
+
+.preco{
+  font-weight:800;
+  margin-top:6px;
+}
+
+/* ================= MIDIAS PRODUTO ================= */
+.midias{
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  margin-bottom:10px;
+}
+
+.midias img,
+.midias video{
+  width:110px;
+  height:110px;
+  border-radius:14px;
+  object-fit:cover;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <input class="search" id="search" placeholder="Buscar produto..." />
+</header>
+
+<div id="banners"></div>
+
+<div id="categorias"></div>
+
+<section id="produtos"></section>
+
+<script>
+/* ================= CONFIG SUPABASE ================= */
+const supabase = supabase.createClient(
+  "https://olutauhrnfxytgwrhhdq.supabase.co",
+  "sb_publishable_0390hL_RDVJ1Ja2fr5ZiFA__v92rJrw"
+);
+
+/* ================= PARAMETRO LOJA ================= */
+const params = new URLSearchParams(location.search);
+const slug = params.get("l") || params.get("slug");
+if(!slug) alert("Loja não informada");
+
+/* ================= VARIAVEIS ================= */
+let lojaId = null;
+let categorias = [];
+let produtos = [];
+
+/* ================= INIT ================= */
+init();
+
+async function init(){
+  await carregarLoja();
+  await carregarBanners();
+  await carregarCategorias();
+  await carregarProdutos();
+  renderCategorias();
+  renderProdutos();
+}
+
+/* ================= LOJA ================= */
+async function carregarLoja(){
+  const { data } = await supabase
+    .from("lojas")
+    .select("*")
+    .eq("slug",slug)
+    .single();
+
+  lojaId = data.id;
+  document.title = data.nome;
+}
+
+/* ================= BANNERS ================= */
+async function carregarBanners(){
+  const { data } = await supabase
+    .from("banners")
+    .select("*")
+    .eq("loja_id",lojaId)
+    .order("ordem");
+
+  const el = document.getElementById("banners");
+  data.forEach(b=>{
+    const d = document.createElement("div");
+    d.className="banner";
+    d.innerHTML = b.tipo==="video"
+      ? `<video src="${b.url}" autoplay muted loop playsinline></video>`
+      : `<img src="${b.url}">`;
+    el.appendChild(d);
+  });
+}
+
+/* ================= CATEGORIAS ================= */
+async function carregarCategorias(){
+  const { data } = await supabase
+    .from("categorias")
+    .select("*")
+    .eq("loja_id",lojaId)
+    .order("ordem");
+  categorias = data;
+}
+
+function renderCategorias(){
+  const el = document.getElementById("categorias");
+  categorias.forEach(c=>{
+    const b = document.createElement("div");
+    b.className="cat";
+    b.innerText=c.nome;
+    b.onclick=()=>filtrarCategoria(c.id,b);
+    el.appendChild(b);
+  });
+}
+
+/* ================= PRODUTOS ================= */
+async function carregarProdutos(){
+  const { data } = await supabase
+    .from("produtos")
+    .select("*, produto_midias(*)")
+    .eq("loja_id",lojaId)
+    .order("created_at");
+  produtos = data;
+}
+
+function renderProdutos(filtroCat=null){
+  const el = document.getElementById("produtos");
+  el.innerHTML="";
+  categorias.forEach(cat=>{
+    const prods = produtos.filter(p=>p.categoria_id===cat.id);
+    if(!prods.length) return;
+
+    const t = document.createElement("div");
+    t.className="categoria-title";
+    t.innerText=cat.nome;
+    el.appendChild(t);
+
+    prods.forEach(p=>{
+      const d = document.createElement("div");
+      d.className="produto";
+
+      const midias = p.produto_midias || [];
+      let mhtml = `<div class="midias">`;
+      midias.forEach(m=>{
+        mhtml += m.tipo==="video"
+          ? `<video src="${m.url}" muted loop playsinline></video>`
+          : `<img src="${m.url}">`;
+      });
+      mhtml += `</div>`;
+
+      d.innerHTML = `
+        ${mhtml}
+        <h3>${p.nome}</h3>
+        <p>${p.descricao||""}</p>
+        <div class="preco">R$ ${p.preco?.toFixed(2)||""}</div>
+      `;
+      el.appendChild(d);
+    });
+  });
+}
+
+/* ================= FILTRO ================= */
+function filtrarCategoria(id,btn){
+  document.querySelectorAll(".cat").forEach(c=>c.classList.remove("active"));
+  btn.classList.add("active");
+  const el = document.getElementById("produtos");
+  el.innerHTML="";
+  const cat = categorias.find(c=>c.id===id);
+  const prods = produtos.filter(p=>p.categoria_id===id);
+  const t = document.createElement("div");
+  t.className="categoria-title";
+  t.innerText=cat.nome;
+  el.appendChild(t);
+  prods.forEach(p=>{
+    const d = document.createElement("div");
+    d.className="produto";
+    d.innerHTML=`<h3>${p.nome}</h3>`;
+    el.appendChild(d);
+  });
+}
+
+/* ================= BUSCA ================= */
+document.getElementById("search").addEventListener("input",e=>{
+  const q = e.target.value.toLowerCase();
+  const el = document.getElementById("produtos");
+  el.innerHTML="";
+  produtos
+    .filter(p=>p.nome.toLowerCase().includes(q))
+    .forEach(p=>{
+      const d = document.createElement("div");
+      d.className="produto";
+      d.innerHTML=`<h3>${p.nome}</h3>`;
+      el.appendChild(d);
+    });
+});
+</script>
+
+</body>
+</html>
