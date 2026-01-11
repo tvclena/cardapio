@@ -37,7 +37,7 @@ html,body{
   font-family:Inter,sans-serif;
 }
 
-/* ================= LOGIN ================= */
+/* ================= AUTH ================= */
 #auth{
   position:fixed;
   inset:0;
@@ -171,8 +171,8 @@ button.save{
     <h1 id="authTitle">Entrar</h1>
     <input id="email" placeholder="E-mail">
     <input id="password" type="password" placeholder="Senha">
-    <button onclick="auth()">Entrar</button>
-    <small onclick="toggleAuth()">Criar conta</small>
+    <button id="authBtn">Entrar</button>
+    <small id="toggleAuth">Criar conta</small>
   </div>
 </div>
 
@@ -185,9 +185,9 @@ button.save{
 </header>
 
 <nav>
-  <button class="active" onclick="openTab('categorias',this)">Categorias</button>
-  <button onclick="openTab('produtos',this)">Produtos</button>
-  <button onclick="openTab('complementos',this)">Complementos</button>
+  <button class="active" data-tab="categorias">Categorias</button>
+  <button data-tab="produtos">Produtos</button>
+  <button data-tab="complementos">Complementos</button>
 </nav>
 
 <section id="categorias" class="active">
@@ -216,138 +216,165 @@ button.save{
 </div>
 
 <script>
-const sb = supabase.createClient(
-  "https://olutauhrnfxytgwrhhdq.supabase.co",
-  "sb_publishable_0390hL_RDVJ1Ja2fr5ZiFA__v92rJrw"
-);
+document.addEventListener("DOMContentLoaded", () => {
 
-let lojaId=null;
-let modo="login";
+  /* ================= SUPABASE ================= */
+  const sb = supabase.createClient(
+    "https://olutauhrnfxytgwrhhdq.supabase.co",
+    "sb_publishable_0390hL_RDVJ1Ja2fr5ZiFA__v92rJrw"
+  );
 
-/* ================= AUTH ================= */
-async function auth(){
-  const emailVal=email.value;
-  const passVal=password.value;
+  /* ================= ELEMENTOS ================= */
+  const authEl   = document.getElementById("auth");
+  const adminEl  = document.getElementById("admin");
+  const authBtn  = document.getElementById("authBtn");
+  const toggleEl = document.getElementById("toggleAuth");
+  const authTitle= document.getElementById("authTitle");
 
-  let res = modo==="login"
-    ? await sb.auth.signInWithPassword({ email:emailVal, password:passVal })
-    : await sb.auth.signUp({ email:emailVal, password:passVal });
+  let modo = "login";
+  let lojaId = null;
 
-  if(res.error) return alert(res.error.message);
+  /* ================= AUTH ================= */
+  authBtn.onclick = async () => {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
 
-  iniciarAdmin();
-}
+    const res = modo === "login"
+      ? await sb.auth.signInWithPassword({ email, password })
+      : await sb.auth.signUp({ email, password });
 
-function toggleAuth(){
-  modo = modo==="login"?"signup":"login";
-  authTitle.innerText = modo==="login"?"Entrar":"Criar Conta";
-}
+    if(res.error){
+      alert(res.error.message);
+      return;
+    }
 
-/* ================= INIT ================= */
-sb.auth.getUser().then(({data})=>{
-  if(data.user) iniciarAdmin();
-});
+    iniciarAdmin();
+  };
 
-async function iniciarAdmin(){
-  auth.style.display="none";
-  admin.style.display="block";
+  toggleEl.onclick = () => {
+    modo = modo === "login" ? "signup" : "login";
+    authTitle.innerText = modo === "login" ? "Entrar" : "Criar Conta";
+    authBtn.innerText   = modo === "login" ? "Entrar" : "Criar Conta";
+  };
 
-  const { data:{user} } = await sb.auth.getUser();
+  /* ================= AUTO LOGIN ================= */
+  sb.auth.getUser().then(({ data }) => {
+    if(data.user){
+      iniciarAdmin();
+    }else{
+      authEl.style.display = "flex";
+      adminEl.style.display = "none";
+    }
+  });
 
-  let { data:loja } = await sb
-    .from("lojas")
-    .select("*")
-    .eq("created_by",user.id)
-    .single();
+  /* ================= INIT ADMIN ================= */
+  async function iniciarAdmin(){
+    authEl.style.display = "none";
+    adminEl.style.display = "block";
 
-  if(!loja){
-    loja = await sb.from("lojas").insert({
-      nome:"Minha Loja",
-      slug: user.id.slice(0,6),
-      created_by:user.id
-    }).select().single();
+    const { data:{ user } } = await sb.auth.getUser();
+    if(!user) return;
+
+    let { data: loja } = await sb
+      .from("lojas")
+      .select("*")
+      .eq("created_by", user.id)
+      .single();
+
+    if(!loja){
+      const res = await sb.from("lojas").insert({
+        nome: "Minha Loja",
+        slug: user.id.slice(0,6),
+        created_by: user.id
+      }).select().single();
+
+      loja = res.data;
+    }
+
+    lojaId = loja.id;
+
+    carregarCategorias();
+    carregarComplementos();
   }
 
-  lojaId = loja.id;
-
-  carregarCategorias();
-  carregarComplementos();
-}
-
-/* ================= UI ================= */
-function openTab(id,btn){
-  document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
-  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
-  btn.classList.add("active");
-}
-
-/* ================= CRUD ================= */
-async function salvarCategoria(){
-  await sb.from("categorias").insert({ loja_id:lojaId, nome:cat_nome.value });
-  cat_nome.value="";
-  carregarCategorias();
-}
-
-async function carregarCategorias(){
-  const { data } = await sb.from("categorias").select("*").eq("loja_id",lojaId);
-  lista_categorias.innerHTML="";
-  prod_categoria.innerHTML="";
-  data.forEach(c=>{
-    lista_categorias.innerHTML+=`<div class="item">${c.nome}</div>`;
-    prod_categoria.innerHTML+=`<option value="${c.id}">${c.nome}</option>`;
+  /* ================= NAV ================= */
+  document.querySelectorAll("nav button").forEach(btn=>{
+    btn.onclick = ()=>{
+      document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+      document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(btn.dataset.tab).classList.add("active");
+    };
   });
-}
 
-async function salvarProduto(){
-  const { data:prod } = await sb.from("produtos").insert({
-    loja_id:lojaId,
-    categoria_id:prod_categoria.value,
-    nome:prod_nome.value,
-    descricao:prod_desc.value,
-    preco:prod_preco.value
-  }).select().single();
+  /* ================= CRUD ================= */
+  window.salvarCategoria = async ()=>{
+    await sb.from("categorias").insert({ loja_id: lojaId, nome: cat_nome.value });
+    cat_nome.value="";
+    carregarCategorias();
+  };
 
-  for(let f of prod_midias.files){
-    const path = `${lojaId}/${prod.id}/${Date.now()}_${f.name}`;
-    await sb.storage.from("produtos").upload(path,f);
-    const { data:url } = sb.storage.from("produtos").getPublicUrl(path);
-    await sb.from("produto_midias").insert({
-      produto_id:prod.id,
-      tipo:f.type.startsWith("video")?"video":"imagem",
-      url:url.publicUrl
+  async function carregarCategorias(){
+    const { data } = await sb.from("categorias").select("*").eq("loja_id", lojaId);
+    lista_categorias.innerHTML="";
+    prod_categoria.innerHTML="";
+    data.forEach(c=>{
+      lista_categorias.innerHTML += `<div class="item">${c.nome}</div>`;
+      prod_categoria.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
     });
   }
 
-  prod_nome.value="";
-  prod_desc.value="";
-  prod_preco.value="";
-  prod_midias.value="";
-}
+  window.salvarProduto = async ()=>{
+    const { data: prod } = await sb.from("produtos").insert({
+      loja_id: lojaId,
+      categoria_id: prod_categoria.value,
+      nome: prod_nome.value,
+      descricao: prod_desc.value,
+      preco: prod_preco.value
+    }).select().single();
 
-async function salvarComplemento(){
-  await sb.from("complementos").insert({
-    loja_id:lojaId,
-    nome:comp_nome.value,
-    preco:comp_preco.value
-  });
-  comp_nome.value="";
-  comp_preco.value="";
-  carregarComplementos();
-}
+    for(const f of prod_midias.files){
+      const path = `${lojaId}/${prod.id}/${Date.now()}_${f.name}`;
+      await sb.storage.from("produtos").upload(path, f);
+      const { data:url } = sb.storage.from("produtos").getPublicUrl(path);
+      await sb.from("produto_midias").insert({
+        produto_id: prod.id,
+        tipo: f.type.startsWith("video") ? "video" : "imagem",
+        url: url.publicUrl
+      });
+    }
 
-async function carregarComplementos(){
-  const { data } = await sb.from("complementos").select("*").eq("loja_id",lojaId);
-  lista_complementos.innerHTML="";
-  data.forEach(c=>{
-    lista_complementos.innerHTML+=`<div class="item">${c.nome}</div>`;
-  });
-}
+    prod_nome.value="";
+    prod_desc.value="";
+    prod_preco.value="";
+    prod_midias.value="";
+  };
 
-function logout(){
-  sb.auth.signOut();
-  location.reload();
-}
+  window.salvarComplemento = async ()=>{
+    await sb.from("complementos").insert({
+      loja_id: lojaId,
+      nome: comp_nome.value,
+      preco: comp_preco.value
+    });
+    comp_nome.value="";
+    comp_preco.value="";
+    carregarComplementos();
+  };
+
+  async function carregarComplementos(){
+    const { data } = await sb.from("complementos").select("*").eq("loja_id", lojaId);
+    lista_complementos.innerHTML="";
+    data.forEach(c=>{
+      lista_complementos.innerHTML += `<div class="item">${c.nome}</div>`;
+    });
+  }
+
+  window.logout = async ()=>{
+    await sb.auth.signOut();
+    location.reload();
+  };
+
+});
 </script>
 
 </body>
