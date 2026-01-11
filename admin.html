@@ -28,19 +28,71 @@
   --accent:#ff6a00;
 }
 
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-}
+*{ box-sizing:border-box; }
 
 html,body{
+  margin:0;
   background:var(--bg);
   color:var(--text);
   font-family:Inter,sans-serif;
 }
 
-/* ================= HEADER ================= */
+/* ================= LOGIN ================= */
+#auth{
+  position:fixed;
+  inset:0;
+  background:#000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:100;
+}
+
+.auth-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:28px;
+  width:100%;
+  max-width:360px;
+}
+
+.auth-card h1{
+  text-align:center;
+  margin-bottom:20px;
+}
+
+.auth-card input{
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:#111;
+  color:#fff;
+  margin-bottom:12px;
+}
+
+.auth-card button{
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  background:var(--accent);
+  color:#000;
+  font-weight:800;
+  border:none;
+}
+
+.auth-card small{
+  display:block;
+  text-align:center;
+  margin-top:12px;
+  color:var(--muted);
+  cursor:pointer;
+}
+
+/* ================= ADMIN ================= */
+#admin{ display:none; }
+
 header{
   position:sticky;
   top:0;
@@ -50,22 +102,13 @@ header{
   justify-content:space-between;
   align-items:center;
   border-bottom:1px solid var(--border);
-  z-index:10;
 }
 
-header h1{
-  font-size:18px;
-}
-
-/* ================= TABS ================= */
 nav{
   display:flex;
   gap:8px;
   padding:12px;
   background:var(--panel);
-  position:sticky;
-  top:60px;
-  z-index:9;
 }
 
 nav button{
@@ -83,17 +126,13 @@ nav button.active{
   color:#000;
 }
 
-/* ================= CONTEUDO ================= */
 section{
   padding:16px;
   display:none;
 }
 
-section.active{
-  display:block;
-}
+section.active{ display:block; }
 
-/* ================= FORM ================= */
 input,textarea,select{
   width:100%;
   padding:12px;
@@ -112,10 +151,8 @@ button.save{
   color:#000;
   font-weight:800;
   border:none;
-  margin-top:6px;
 }
 
-/* ================= LIST ================= */
 .item{
   background:var(--card);
   border:1px solid var(--border);
@@ -123,13 +160,24 @@ button.save{
   padding:12px;
   margin-bottom:10px;
 }
-.item small{
-  color:var(--muted);
-}
 </style>
 </head>
 
 <body>
+
+<!-- ================= LOGIN / CADASTRO ================= -->
+<div id="auth">
+  <div class="auth-card">
+    <h1 id="authTitle">Entrar</h1>
+    <input id="email" placeholder="E-mail">
+    <input id="password" type="password" placeholder="Senha">
+    <button onclick="auth()">Entrar</button>
+    <small onclick="toggleAuth()">Criar conta</small>
+  </div>
+</div>
+
+<!-- ================= ADMIN ================= -->
+<div id="admin">
 
 <header>
   <h1>Admin • Cardápio</h1>
@@ -142,62 +190,83 @@ button.save{
   <button onclick="openTab('complementos',this)">Complementos</button>
 </nav>
 
-<!-- ================= CATEGORIAS ================= -->
 <section id="categorias" class="active">
-  <h2>Nova Categoria</h2>
   <input id="cat_nome" placeholder="Nome da categoria">
   <button class="save" onclick="salvarCategoria()">Salvar</button>
-
-  <h2 style="margin-top:20px">Categorias</h2>
   <div id="lista_categorias"></div>
 </section>
 
-<!-- ================= PRODUTOS ================= -->
 <section id="produtos">
-  <h2>Novo Produto</h2>
   <select id="prod_categoria"></select>
   <input id="prod_nome" placeholder="Nome">
   <textarea id="prod_desc" placeholder="Descrição"></textarea>
   <input id="prod_preco" type="number" step="0.01" placeholder="Preço">
-  <input type="file" id="prod_midias" multiple accept="image/*,video/*">
+  <input type="file" id="prod_midias" multiple>
   <button class="save" onclick="salvarProduto()">Salvar Produto</button>
-
-  <h2 style="margin-top:20px">Produtos</h2>
   <div id="lista_produtos"></div>
 </section>
 
-<!-- ================= COMPLEMENTOS ================= -->
 <section id="complementos">
-  <h2>Novo Complemento</h2>
   <input id="comp_nome" placeholder="Nome">
   <input id="comp_preco" type="number" step="0.01" placeholder="Preço">
   <button class="save" onclick="salvarComplemento()">Salvar</button>
-
-  <h2 style="margin-top:20px">Complementos</h2>
   <div id="lista_complementos"></div>
 </section>
 
+</div>
+
 <script>
-/* ================= SUPABASE ================= */
-const supabase = supabase.createClient(
+const sb = supabase.createClient(
   "https://olutauhrnfxytgwrhhdq.supabase.co",
   "sb_publishable_0390hL_RDVJ1Ja2fr5ZiFA__v92rJrw"
 );
 
 let lojaId=null;
+let modo="login";
+
+/* ================= AUTH ================= */
+async function auth(){
+  const emailVal=email.value;
+  const passVal=password.value;
+
+  let res = modo==="login"
+    ? await sb.auth.signInWithPassword({ email:emailVal, password:passVal })
+    : await sb.auth.signUp({ email:emailVal, password:passVal });
+
+  if(res.error) return alert(res.error.message);
+
+  iniciarAdmin();
+}
+
+function toggleAuth(){
+  modo = modo==="login"?"signup":"login";
+  authTitle.innerText = modo==="login"?"Entrar":"Criar Conta";
+}
 
 /* ================= INIT ================= */
-init();
+sb.auth.getUser().then(({data})=>{
+  if(data.user) iniciarAdmin();
+});
 
-async function init(){
-  const { data:{user} } = await supabase.auth.getUser();
-  if(!user) location.href="login.html";
+async function iniciarAdmin(){
+  auth.style.display="none";
+  admin.style.display="block";
 
-  const { data: loja } = await supabase
+  const { data:{user} } = await sb.auth.getUser();
+
+  let { data:loja } = await sb
     .from("lojas")
     .select("*")
     .eq("created_by",user.id)
     .single();
+
+  if(!loja){
+    loja = await sb.from("lojas").insert({
+      nome:"Minha Loja",
+      slug: user.id.slice(0,6),
+      created_by:user.id
+    }).select().single();
+  }
 
   lojaId = loja.id;
 
@@ -213,41 +282,25 @@ function openTab(id,btn){
   btn.classList.add("active");
 }
 
-/* ================= CATEGORIAS ================= */
+/* ================= CRUD ================= */
 async function salvarCategoria(){
-  const nome = cat_nome.value;
-  if(!nome) return;
-
-  await supabase.from("categorias").insert({
-    loja_id:lojaId,
-    nome
-  });
-
+  await sb.from("categorias").insert({ loja_id:lojaId, nome:cat_nome.value });
   cat_nome.value="";
   carregarCategorias();
 }
 
 async function carregarCategorias(){
-  const { data } = await supabase
-    .from("categorias")
-    .select("*")
-    .eq("loja_id",lojaId);
-
+  const { data } = await sb.from("categorias").select("*").eq("loja_id",lojaId);
   lista_categorias.innerHTML="";
   prod_categoria.innerHTML="";
-
   data.forEach(c=>{
-    lista_categorias.innerHTML += `
-      <div class="item">
-        <strong>${c.nome}</strong>
-      </div>`;
-    prod_categoria.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+    lista_categorias.innerHTML+=`<div class="item">${c.nome}</div>`;
+    prod_categoria.innerHTML+=`<option value="${c.id}">${c.nome}</option>`;
   });
 }
 
-/* ================= PRODUTOS ================= */
 async function salvarProduto(){
-  const { data:prod } = await supabase.from("produtos").insert({
+  const { data:prod } = await sb.from("produtos").insert({
     loja_id:lojaId,
     categoria_id:prod_categoria.value,
     nome:prod_nome.value,
@@ -255,21 +308,14 @@ async function salvarProduto(){
     preco:prod_preco.value
   }).select().single();
 
-  const files = prod_midias.files;
-  for(let i=0;i<files.length && i<3;i++){
-    const file = files[i];
-    const path = `${lojaId}/${prod.id}/${Date.now()}_${file.name}`;
-
-    await supabase.storage.from("produtos").upload(path,file);
-
-    const { data:url } = supabase
-      .storage.from("produtos").getPublicUrl(path);
-
-    await supabase.from("produto_midias").insert({
+  for(let f of prod_midias.files){
+    const path = `${lojaId}/${prod.id}/${Date.now()}_${f.name}`;
+    await sb.storage.from("produtos").upload(path,f);
+    const { data:url } = sb.storage.from("produtos").getPublicUrl(path);
+    await sb.from("produto_midias").insert({
       produto_id:prod.id,
-      tipo:file.type.startsWith("video")?"video":"imagem",
-      url:url.publicUrl,
-      ordem:i+1
+      tipo:f.type.startsWith("video")?"video":"imagem",
+      url:url.publicUrl
     });
   }
 
@@ -277,59 +323,30 @@ async function salvarProduto(){
   prod_desc.value="";
   prod_preco.value="";
   prod_midias.value="";
-
-  carregarProdutos();
 }
 
-async function carregarProdutos(){
-  const { data } = await supabase
-    .from("produtos")
-    .select("*")
-    .eq("loja_id",lojaId);
-
-  lista_produtos.innerHTML="";
-  data.forEach(p=>{
-    lista_produtos.innerHTML += `
-      <div class="item">
-        <strong>${p.nome}</strong><br>
-        <small>R$ ${p.preco}</small>
-      </div>`;
-  });
-}
-
-/* ================= COMPLEMENTOS ================= */
 async function salvarComplemento(){
-  await supabase.from("complementos").insert({
+  await sb.from("complementos").insert({
     loja_id:lojaId,
     nome:comp_nome.value,
     preco:comp_preco.value
   });
-
   comp_nome.value="";
   comp_preco.value="";
   carregarComplementos();
 }
 
 async function carregarComplementos(){
-  const { data } = await supabase
-    .from("complementos")
-    .select("*")
-    .eq("loja_id",lojaId);
-
+  const { data } = await sb.from("complementos").select("*").eq("loja_id",lojaId);
   lista_complementos.innerHTML="";
   data.forEach(c=>{
-    lista_complementos.innerHTML += `
-      <div class="item">
-        <strong>${c.nome}</strong>
-        <small>R$ ${c.preco}</small>
-      </div>`;
+    lista_complementos.innerHTML+=`<div class="item">${c.nome}</div>`;
   });
 }
 
-/* ================= LOGOUT ================= */
 function logout(){
-  supabase.auth.signOut();
-  location.href="login.html";
+  sb.auth.signOut();
+  location.reload();
 }
 </script>
 
