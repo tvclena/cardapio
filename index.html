@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 
 <title>Cardápio Digital</title>
 
@@ -13,105 +13,62 @@
   viewport-fit=cover">
 
 <meta name="theme-color" content="#000000">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
 :root{
   --bg:#000;
-  --panel:#0e0e0e;
-  --card:#141414;
+  --panel:#0f0f0f;
+  --card:#151515;
+  --border:#222;
   --text:#fff;
   --muted:#aaa;
-  --border:#222;
   --accent:#ff6a00;
 }
 
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-  -webkit-tap-highlight-color: transparent;
-}
-
-html,body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:Inter,system-ui,sans-serif;
-  overscroll-behavior: none;
-  touch-action: manipulation;
-}
+*{box-sizing:border-box;margin:0;padding:0}
 
 body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:Inter,sans-serif;
   padding-bottom:80px;
 }
 
-/* ================= HEADER ================= */
+/* HEADER */
 header{
   position:sticky;
   top:0;
   z-index:10;
-  background:linear-gradient(180deg,#000 70%,transparent);
+  background:#000;
   padding:16px;
 }
 
 .search{
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:14px;
+  width:100%;
   padding:14px;
-  color:#fff;
-  width:100%;
-  font-size:16px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:var(--panel);
+  remember color:#fff;
 }
 
-/* ================= BANNERS ================= */
-#banners{
-  display:flex;
-  overflow-x:auto;
-  gap:12px;
-  padding:16px;
-  scroll-snap-type:x mandatory;
-}
-
-.banner{
-  min-width:90%;
-  height:200px;
-  border-radius:18px;
-  overflow:hidden;
-  background:#000;
-  scroll-snap-align:center;
-}
-
-.banner img,
-.banner video{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
-
-/* ================= CATEGORIAS ================= */
+/* CATEGORIAS */
 #categorias{
   display:flex;
   gap:10px;
-  padding:12px 16px;
+  padding:12px;
   overflow-x:auto;
 }
 
 .cat{
   padding:10px 16px;
+  border-radius:999px;
   background:var(--panel);
   border:1px solid var(--border);
-  border-radius:999px;
   white-space:nowrap;
-  font-weight:600;
   cursor:pointer;
 }
 
@@ -120,10 +77,8 @@ header{
   color:#000;
 }
 
-/* ================= PRODUTOS ================= */
-section{
-  padding:16px;
-}
+/* PRODUTOS */
+section{padding:16px}
 
 .categoria-title{
   font-size:20px;
@@ -138,22 +93,15 @@ section{
   margin-bottom:14px;
 }
 
-.produto h3{
-  font-size:17px;
-}
-
-.produto p{
-  font-size:14px;
-  color:var(--muted);
-  margin:6px 0;
-}
+.produto h3{font-size:17px}
+.produto p{font-size:14px;color:var(--muted);margin:6px 0}
 
 .preco{
   font-weight:800;
   margin-top:6px;
 }
 
-/* ================= MIDIAS PRODUTO ================= */
+/* MIDIAS */
 .midias{
   display:flex;
   gap:8px;
@@ -161,8 +109,7 @@ section{
   margin-bottom:10px;
 }
 
-.midias img,
-.midias video{
+.midias img,.midias video{
   width:110px;
   height:110px;
   border-radius:14px;
@@ -177,35 +124,34 @@ section{
   <input class="search" id="search" placeholder="Buscar produto..." />
 </header>
 
-<div id="banners"></div>
-
 <div id="categorias"></div>
-
 <section id="produtos"></section>
 
 <script>
-/* ================= CONFIG SUPABASE ================= */
-const supabase = supabase.createClient(
+/* ================= SUPABASE ================= */
+const sb = supabase.createClient(
   "https://olutauhrnfxytgwrhhdq.supabase.co",
   "sb_publishable_0390hL_RDVJ1Ja2fr5ZiFA__v92rJrw"
 );
 
-/* ================= PARAMETRO LOJA ================= */
+/* ================= SLUG ================= */
 const params = new URLSearchParams(location.search);
 const slug = params.get("l") || params.get("slug");
-if(!slug) alert("Loja não informada");
 
-/* ================= VARIAVEIS ================= */
-let lojaId = null;
-let categorias = [];
-let produtos = [];
+if(!slug){
+  alert("Loja não informada. Use ?l=slug");
+  throw new Error("Slug ausente");
+}
+
+let lojaId=null;
+let categorias=[];
+let produtos=[];
 
 /* ================= INIT ================= */
 init();
 
 async function init(){
   await carregarLoja();
-  await carregarBanners();
   await carregarCategorias();
   await carregarProdutos();
   renderCategorias();
@@ -214,7 +160,7 @@ async function init(){
 
 /* ================= LOJA ================= */
 async function carregarLoja(){
-  const { data } = await supabase
+  const { data } = await sb
     .from("lojas")
     .select("*")
     .eq("slug",slug)
@@ -224,39 +170,22 @@ async function carregarLoja(){
   document.title = data.nome;
 }
 
-/* ================= BANNERS ================= */
-async function carregarBanners(){
-  const { data } = await supabase
-    .from("banners")
-    .select("*")
-    .eq("loja_id",lojaId)
-    .order("ordem");
-
-  const el = document.getElementById("banners");
-  data.forEach(b=>{
-    const d = document.createElement("div");
-    d.className="banner";
-    d.innerHTML = b.tipo==="video"
-      ? `<video src="${b.url}" autoplay muted loop playsinline></video>`
-      : `<img src="${b.url}">`;
-    el.appendChild(d);
-  });
-}
-
 /* ================= CATEGORIAS ================= */
 async function carregarCategorias(){
-  const { data } = await supabase
+  const { data } = await sb
     .from("categorias")
     .select("*")
     .eq("loja_id",lojaId)
     .order("ordem");
+
   categorias = data;
 }
 
 function renderCategorias(){
   const el = document.getElementById("categorias");
+  el.innerHTML="";
   categorias.forEach(c=>{
-    const b = document.createElement("div");
+    const b=document.createElement("div");
     b.className="cat";
     b.innerText=c.nome;
     b.onclick=()=>filtrarCategoria(c.id,b);
@@ -266,44 +195,44 @@ function renderCategorias(){
 
 /* ================= PRODUTOS ================= */
 async function carregarProdutos(){
-  const { data } = await supabase
+  const { data } = await sb
     .from("produtos")
     .select("*, produto_midias(*)")
     .eq("loja_id",lojaId)
     .order("created_at");
-  produtos = data;
+
+  produtos=data;
 }
 
-function renderProdutos(filtroCat=null){
-  const el = document.getElementById("produtos");
+function renderProdutos(filtro=null){
+  const el=document.getElementById("produtos");
   el.innerHTML="";
+
   categorias.forEach(cat=>{
-    const prods = produtos.filter(p=>p.categoria_id===cat.id);
+    const prods=produtos.filter(p=>p.categoria_id===cat.id);
     if(!prods.length) return;
 
-    const t = document.createElement("div");
+    const t=document.createElement("div");
     t.className="categoria-title";
     t.innerText=cat.nome;
     el.appendChild(t);
 
     prods.forEach(p=>{
-      const d = document.createElement("div");
+      const d=document.createElement("div");
       d.className="produto";
 
-      const midias = p.produto_midias || [];
-      let mhtml = `<div class="midias">`;
-      midias.forEach(m=>{
-        mhtml += m.tipo==="video"
+      let midias="";
+      (p.produto_midias||[]).forEach(m=>{
+        midias+= m.tipo==="video"
           ? `<video src="${m.url}" muted loop playsinline></video>`
           : `<img src="${m.url}">`;
       });
-      mhtml += `</div>`;
 
-      d.innerHTML = `
-        ${mhtml}
+      d.innerHTML=`
+        <div class="midias">${midias}</div>
         <h3>${p.nome}</h3>
         <p>${p.descricao||""}</p>
-        <div class="preco">R$ ${p.preco?.toFixed(2)||""}</div>
+        <div class="preco">R$ ${Number(p.preco).toFixed(2)}</div>
       `;
       el.appendChild(d);
     });
@@ -314,16 +243,18 @@ function renderProdutos(filtroCat=null){
 function filtrarCategoria(id,btn){
   document.querySelectorAll(".cat").forEach(c=>c.classList.remove("active"));
   btn.classList.add("active");
-  const el = document.getElementById("produtos");
+  const el=document.getElementById("produtos");
   el.innerHTML="";
-  const cat = categorias.find(c=>c.id===id);
-  const prods = produtos.filter(p=>p.categoria_id===id);
-  const t = document.createElement("div");
+  const cat=categorias.find(c=>c.id===id);
+  const prods=produtos.filter(p=>p.categoria_id===id);
+
+  const t=document.createElement("div");
   t.className="categoria-title";
   t.innerText=cat.nome;
   el.appendChild(t);
+
   prods.forEach(p=>{
-    const d = document.createElement("div");
+    const d=document.createElement("div");
     d.className="produto";
     d.innerHTML=`<h3>${p.nome}</h3>`;
     el.appendChild(d);
@@ -332,23 +263,18 @@ function filtrarCategoria(id,btn){
 
 /* ================= BUSCA ================= */
 document.getElementById("search").addEventListener("input",e=>{
-  const q = e.target.value.toLowerCase();
-  const el = document.getElementById("produtos");
+  const q=e.target.value.toLowerCase();
+  const el=document.getElementById("produtos");
   el.innerHTML="";
   produtos
     .filter(p=>p.nome.toLowerCase().includes(q))
     .forEach(p=>{
-      const d = document.createElement("div");
+      const d=document.createElement("div");
       d.className="produto";
-      d.innerHTML=`<h3>${p.nome}</h3>`;
+      d.innerHTML=`<h3>${p.nome}</h3`;
       el.appendChild(d);
     });
 });
-</script>
-<script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/service-worker.js");
-}
 </script>
 
 </body>
